@@ -50,7 +50,7 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
     p->gravity          = 981.f;
     p->damping_ps       = 0.06f;
     p->max_speed_factor = 12.0f;  // rad/s cap
-    p->base_k           = 60.f;   // base spring (1/s^2)
+    p->base_k           = 100.f;   // base spring (1/s^2)
     p->base_d           = 12.f;   // base damping (1/s)
     p->first_frame      = true;
 
