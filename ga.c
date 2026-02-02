@@ -124,6 +124,14 @@ static void ga_step_agent(GAContext* ga, GAAgent* a, Genome* g, float dt, int wr
     }
 
     // penalties: base motion + angular speed (inertia)
+    // keep base near center (0)
+    {
+        const float center_x = ga->track_left + ga->track_width * 0.5f;
+        float base_dist = fabsf(a->pivot_x - center_x) / (ga->track_width * 0.5f);
+        if (base_dist > 1.f)
+            base_dist = 1.f;
+        a->fitness -= dt * 0.15f * base_dist;
+    }
     a->fitness -= dt * 0.05f * (fabsf(a->pivot_v) / ga->max_base_speed);
     a->fitness -= dt * 0.08f * fabsf(a->omega);
     if (a->fitness < 0.f)
