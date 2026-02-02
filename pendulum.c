@@ -52,6 +52,7 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
     p->max_speed_factor = 12.0f;  // rad/s cap
     p->base_k           = 100.f;   // base spring (1/s^2)
     p->base_d           = 12.f;   // base damping (1/s)
+    p->max_base_speed   = 600.f;  // px/s cap for GA control
     p->first_frame      = true;
 
     // Slider setup
@@ -67,6 +68,8 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
     // Initial pivot/bob
     p->pivot      = (sfVector2f){window_size.x / 2.f, window_size.y / 2.f};
     p->pivot_vel_x = 0.f;
+    p->external_control = 0;
+    p->base_vel_cmd = 0.f;
 
     p->theta = -0.7f;
     p->omega = 0.f;
@@ -148,6 +151,8 @@ void pendulum_handle_event(Pendulum* p, const sfEvent* event)
 {
     if (!p || !event)
         return;
+    if (p->external_control)
+        return;
 
     if (event->type == sfEvtMouseButtonPressed && event->mouseButton.button == sfMouseLeft)
     {
@@ -205,12 +210,32 @@ void pendulum_update(Pendulum* p, float dt)
     if (dt > 0.02f)
         dt = 0.02f;
 
-    // Slider-driven pivot (horizontal) with spring-damper
+    // If GA is active, integrate its velocity command into the slider target
+    if (p->external_control && dt > 0.f)
+    {
+        float cmd = clampf(p->base_vel_cmd, -p->max_base_speed, p->max_base_speed);
+        float delta = (cmd * dt) / p->track_width; // px/s -> slider units
+        p->slider_value = clampf(p->slider_value + delta, 0.f, 1.f);
+    }
+
+    // Slider-driven pivot (horizontal) with spring-damper (same physics for GA and manual)
     float pivot_target_x = p->track_left + p->slider_value * p->track_width;
     float dx = pivot_target_x - p->pivot.x;
     float pivot_acc_x = p->base_k * dx - p->base_d * p->pivot_vel_x;
     p->pivot_vel_x += pivot_acc_x * dt;
     p->pivot.x += p->pivot_vel_x * dt;
+
+    // Clamp pivot to track
+    if (p->pivot.x < p->track_left)
+    {
+        p->pivot.x = p->track_left;
+        p->pivot_vel_x = 0.f;
+    }
+    if (p->pivot.x > p->track_left + p->track_width)
+    {
+        p->pivot.x = p->track_left + p->track_width;
+        p->pivot_vel_x = 0.f;
+    }
     sfCircleShape_setPosition(p->pivot_shape, p->pivot);
     sfRectangleShape_setPosition(p->rod, p->pivot);
 
@@ -269,4 +294,71 @@ void pendulum_destroy(Pendulum* p)
     sfCircleShape_destroy(p->bob_shape);
     sfRectangleShape_destroy(p->slider_track);
     sfCircleShape_destroy(p->slider_thumb);
+}
+
+void pendulum_set_external_control(Pendulum* p, int enabled)
+{
+    if (!p)
+        return;
+    p->external_control = enabled ? 1 : 0;
+    p->slider_drag = false;
+    p->bob_drag = false;
+    if (!p->external_control)
+        p->base_vel_cmd = 0.f;
+}
+
+void pendulum_set_base_velocity(Pendulum* p, float v)
+{
+    if (!p)
+        return;
+    p->base_vel_cmd = v;
+}
+
+void pendulum_reset(Pendulum* p)
+{
+    if (!p)
+        return;
+    p->slider_value = 0.5f;
+    p->pivot.x = p->track_left + p->track_width * p->slider_value;
+    p->pivot_vel_x = 0.f;
+    p->base_vel_cmd = 0.f;
+    p->theta = -0.7f;
+    p->omega = 0.f;
+    p->bob_pos.x = p->pivot.x + p->length * sinf(p->theta);
+    p->bob_pos.y = p->pivot.y + p->length * cosf(p->theta);
+    sfCircleShape_setPosition(p->pivot_shape, p->pivot);
+    sfCircleShape_setPosition(p->bob_shape, p->bob_pos);
+    sfCircleShape_setPosition(
+        p->slider_thumb,
+        (sfVector2f){p->track_left + p->slider_value * p->track_width,
+                     p->track_y + p->track_height / 2.f});
+}
+
+void pendulum_get_state(const Pendulum* p, float* theta, float* omega, float* pivot_x)
+{
+    if (!p)
+        return;
+    if (theta)
+        *theta = p->theta;
+    if (omega)
+        *omega = p->omega;
+    if (pivot_x)
+        *pivot_x = p->pivot.x;
+}
+
+void pendulum_get_inputs(const Pendulum* p, float* position, float* dirx, float* diry, float* omega)
+{
+    if (!p)
+        return;
+    if (position)
+    {
+        float norm = (p->pivot.x - p->track_left) / p->track_width;
+        *position = norm * 2.f - 1.f; // [-1, 1]
+    }
+    if (dirx)
+        *dirx = sinf(p->theta);
+    if (diry)
+        *diry = cosf(p->theta);
+    if (omega)
+        *omega = p->omega;
 }
