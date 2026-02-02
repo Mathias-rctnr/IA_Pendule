@@ -1,5 +1,7 @@
 # IA_Pendule (CSFML)
 
+<img width="3024" height="2292" alt="image" src="https://github.com/user-attachments/assets/4eddbdb4-e7d2-42cf-b10a-951614d3de31" />
+
 Petit projet perso pour tester un pendule contrôlé par un algorithme génétique.  
 Le but est simple : faire apprendre à un réseau de neurones à stabiliser la masse vers le haut, en jouant uniquement sur la vitesse de la base.
 
@@ -24,5 +26,3 @@ gcc main.c pendulum.c ga.c -o pendule \
   -I/opt/homebrew/include \
   -L/opt/homebrew/lib \
   -lcsfml-graphics -lcsfml-window -lcsfml-system -lcsfml-audio -lm -pthread
-
-<img width="3024" height="2292" alt="image" src="https://github.com/user-attachments/assets/4eddbdb4-e7d2-42cf-b10a-951614d3de31" />
