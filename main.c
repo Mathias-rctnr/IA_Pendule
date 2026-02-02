@@ -8,6 +8,111 @@
 #include "pendulum.h"
 #include "ga.h"
 
+static float clampf(float v, float lo, float hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+static void draw_network(sfRenderWindow* window, const GAContext* ga, sfVector2u win_size)
+{
+    if (!window || !ga || !ga->has_champion)
+        return;
+
+    const Genome* g = &ga->champion;
+    const int in_count = GA_INPUTS;
+    const int hid_count = g->hidden;
+    const int out_count = 1;
+
+    const float panel_w = 260.f;
+    const float panel_h = 200.f + (hid_count > 4 ? (hid_count - 4) * 12.f : 0.f);
+    const float panel_x = (float)win_size.x - panel_w - 20.f;
+    const float panel_y = 20.f;
+
+    sfRectangleShape* bg = sfRectangleShape_create();
+    sfRectangleShape_setSize(bg, (sfVector2f){panel_w, panel_h});
+    sfRectangleShape_setPosition(bg, (sfVector2f){panel_x, panel_y});
+    sfRectangleShape_setFillColor(bg, (sfColor){0x00, 0x00, 0x00, 0x55});
+    sfRenderWindow_drawRectangleShape(window, bg, NULL);
+    sfRectangleShape_destroy(bg);
+
+    const float left_x = panel_x + 25.f;
+    const float right_x = panel_x + panel_w - 25.f;
+    const float mid_x = (left_x + right_x) * 0.5f;
+
+    const float in_top = panel_y + 20.f;
+    const float in_bottom = panel_y + panel_h - 20.f;
+    const float hid_top = panel_y + 20.f;
+    const float hid_bottom = panel_y + panel_h - 20.f;
+
+    sfVector2f in_pos[GA_INPUTS];
+    sfVector2f hid_pos[GA_MAX_HIDDEN];
+    sfVector2f out_pos = {right_x, (in_top + in_bottom) * 0.5f};
+
+    for (int i = 0; i < in_count; ++i)
+    {
+        float t = (in_count == 1) ? 0.5f : (float)i / (float)(in_count - 1);
+        in_pos[i] = (sfVector2f){left_x, in_top + t * (in_bottom - in_top)};
+    }
+    for (int i = 0; i < hid_count; ++i)
+    {
+        float t = (hid_count == 1) ? 0.5f : (float)i / (float)(hid_count - 1);
+        hid_pos[i] = (sfVector2f){mid_x, hid_top + t * (hid_bottom - hid_top)};
+    }
+
+    // links: input -> hidden
+    for (int h = 0; h < hid_count; ++h)
+    {
+        for (int i = 0; i < in_count; ++i)
+        {
+            float w = g->w_in[h][i];
+            float a = clampf(fabsf(w), 0.f, 1.f);
+            uint8_t alpha = (uint8_t)(40 + 180 * a);
+            sfColor col = (w >= 0.f) ? (sfColor){0x6A, 0xE3, 0x74, alpha}
+                                     : (sfColor){0xFF, 0x66, 0x66, alpha};
+            sfVertex line[2] = {
+                { .position = in_pos[i], .color = col },
+                { .position = hid_pos[h], .color = col }
+            };
+            sfRenderWindow_drawPrimitives(window, line, 2, sfLines, NULL);
+        }
+    }
+
+    // links: hidden -> output
+    for (int h = 0; h < hid_count; ++h)
+    {
+        float w = g->w_out[h];
+        float a = clampf(fabsf(w), 0.f, 1.f);
+        uint8_t alpha = (uint8_t)(40 + 180 * a);
+        sfColor col = (w >= 0.f) ? (sfColor){0x6A, 0xE3, 0x74, alpha}
+                                 : (sfColor){0xFF, 0x66, 0x66, alpha};
+        sfVertex line[2] = {
+            { .position = hid_pos[h], .color = col },
+            { .position = out_pos, .color = col }
+        };
+        sfRenderWindow_drawPrimitives(window, line, 2, sfLines, NULL);
+    }
+
+    // nodes
+    sfCircleShape* node = sfCircleShape_create();
+    sfCircleShape_setRadius(node, 5.f);
+    sfCircleShape_setOrigin(node, (sfVector2f){5.f, 5.f});
+    sfCircleShape_setFillColor(node, (sfColor){0xF4, 0xEE, 0x2A, 0xFF});
+
+    for (int i = 0; i < in_count; ++i)
+    {
+        sfCircleShape_setPosition(node, in_pos[i]);
+        sfRenderWindow_drawCircleShape(window, node, NULL);
+    }
+    for (int i = 0; i < hid_count; ++i)
+    {
+        sfCircleShape_setPosition(node, hid_pos[i]);
+        sfRenderWindow_drawCircleShape(window, node, NULL);
+    }
+    sfCircleShape_setPosition(node, out_pos);
+    sfRenderWindow_drawCircleShape(window, node, NULL);
+    sfCircleShape_destroy(node);
+}
+
 int main(void)
 {
     const sfVideoMode mode = {1400, 1050, 32};
@@ -24,7 +129,7 @@ int main(void)
     }
 
     GAContext ga;
-    ga_init(&ga, 60);
+    ga_init(&ga, 150);
     ga_set_env(&ga,
                pendulum.track_left,
                pendulum.track_width,
@@ -36,7 +141,7 @@ int main(void)
                pendulum.damping_ps,
                pendulum.max_speed_factor,
                pendulum.max_base_speed,
-               -0.7f);
+               -0.98f);
 
     sfFont* font = sfFont_createFromFile("tuffy.ttf");
     sfText* info_text = sfText_create(font);
@@ -47,8 +152,10 @@ int main(void)
     sfRectangleShape* threshold_line = sfRectangleShape_create();
     sfRectangleShape* chart_bg = sfRectangleShape_create();
     sfVertexArray* chart_line = sfVertexArray_create();
+    sfVertexArray* grad_ticks = sfVertexArray_create();
+    sfText* grad_text = sfText_create(font);
     if (!font || !info_text || !button_text || !button || !agent_rod || !agent_bob || !threshold_line || !chart_bg ||
-        !chart_line)
+        !chart_line || !grad_ticks || !grad_text)
     {
         pendulum_destroy(&pendulum);
         sfRenderWindow_destroy(window);
@@ -60,6 +167,8 @@ int main(void)
 
     sfText_setCharacterSize(button_text, 16);
     sfText_setFillColor(button_text, sfWhite);
+    sfText_setCharacterSize(grad_text, 12);
+    sfText_setFillColor(grad_text, (sfColor){0xF4, 0xEE, 0x2A, 0xFF});
     sfRectangleShape_setSize(button, (sfVector2f){140.f, 36.f});
     sfRectangleShape_setPosition(button, (sfVector2f){20.f, 20.f});
     sfRectangleShape_setFillColor(button, (sfColor){0x2A, 0x2A, 0x2A, 0xFF});
@@ -73,6 +182,26 @@ int main(void)
     sfRectangleShape_setFillColor(threshold_line, (sfColor){0xFF, 0x66, 0x66, 0x80});
     float threshold_y = pendulum.pivot.y + pendulum.length * ga.upright_threshold;
     sfRectangleShape_setPosition(threshold_line, (sfVector2f){0.f, threshold_y});
+
+    sfVertexArray_setPrimitiveType(grad_ticks, sfLines);
+    const sfFloatRect base_bounds = sfConvexShape_getGlobalBounds(pendulum.base_rect);
+    const float grad_y = base_bounds.position.y + base_bounds.size.y + 25.f;
+    const float grad_span = base_bounds.size.x;
+    const float grad_left = base_bounds.position.x;
+    const int grad_min = -50;
+    const int grad_max = 50;
+    for (int v = grad_min; v <= grad_max; ++v)
+    {
+        float t = (float)(v - grad_min) / (float)(grad_max - grad_min);
+        float x = grad_left + t * grad_span;
+        bool major = (v % 10) == 0;
+        float h = major ? 10.f : 5.f;
+        sfColor col = major ? (sfColor){0xF4, 0xEE, 0x2A, 0xFF} : (sfColor){0xCC, 0xCC, 0xCC, 0xFF};
+        sfVertex v0 = { .position = {x, grad_y}, .color = col };
+        sfVertex v1 = { .position = {x, grad_y + h}, .color = col };
+        sfVertexArray_append(grad_ticks, v0);
+        sfVertexArray_append(grad_ticks, v1);
+    }
 
     const float chart_x = 200.f;
     const float chart_y = 20.f;
@@ -211,10 +340,29 @@ int main(void)
                 sfRenderWindow_drawRectangleShape(window, agent_rod, NULL);
                 sfRenderWindow_drawCircleShape(window, agent_bob, NULL);
             }
+
+            draw_network(window, &ga, mode.size);
         }
         else if (!ga.running)
         {
             pendulum_draw(&pendulum, window);
+        }
+        else
+        {
+            sfRenderWindow_drawConvexShape(window, pendulum.base_rect, NULL);
+        }
+        sfRenderWindow_drawVertexArray(window, grad_ticks, NULL);
+        // labels for major ticks
+        for (int v = grad_min; v <= grad_max; v += 10)
+        {
+            float t = (float)(v - grad_min) / (float)(grad_max - grad_min);
+            float x = grad_left + t * grad_span;
+            char label[8];
+            snprintf(label, sizeof(label), "%d", v);
+            sfText_setString(grad_text, label);
+            sfFloatRect b = sfText_getLocalBounds(grad_text);
+            sfText_setPosition(grad_text, (sfVector2f){x - b.size.x * 0.5f, grad_y + 12.f});
+            sfRenderWindow_drawText(window, grad_text, NULL);
         }
         if (history_count > 1)
         {
@@ -303,6 +451,8 @@ int main(void)
     sfRectangleShape_destroy(threshold_line);
     sfRectangleShape_destroy(chart_bg);
     sfVertexArray_destroy(chart_line);
+    sfVertexArray_destroy(grad_ticks);
+    sfText_destroy(grad_text);
     free(history);
     sfFont_destroy(font);
     sfRenderWindow_destroy(window);

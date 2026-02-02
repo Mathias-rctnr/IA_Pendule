@@ -100,25 +100,34 @@ static void ga_step_agent(GAContext* ga, GAAgent* a, Genome* g, float dt, int wr
     a->bob_x = a->pivot_x + ga->length * sinf(a->theta);
     a->bob_y = ga->pivot_y + ga->length * cosf(a->theta);
 
-    // success condition: above threshold for >1s, then +1 point each extra second (discrete)
+    // reward: above threshold + bonus for staying near angle 0
+    const float center_range = 0.35f; // radians where bonus is strongest
+    const float center_bonus = 0.3f;  // weight of the bonus
+    const float drop_penalty = 0.6f;  // penalty when leaving the threshold
     if (cosf(a->theta) < ga->upright_threshold)
     {
+        float closeness = 1.f - (fabsf(a->theta) / center_range);
+        if (closeness < 0.f)
+            closeness = 0.f;
+        if (closeness > 1.f)
+            closeness = 1.f;
+
+        a->fitness += dt; // base reward for being above threshold
+        a->fitness += dt * center_bonus * closeness; // extra reward near 0
         a->above_time += dt;
-        if (a->above_time > 1.f)
-        {
-            float extra = a->above_time - 1.f;
-            int points = (int)floorf(extra);
-            if (points > 0)
-            {
-                a->fitness += (float)points;
-                a->above_time -= (float)points;
-            }
-        }
     }
     else
     {
+        if (a->above_time > 0.f)
+            a->fitness -= drop_penalty;
         a->above_time = 0.f;
     }
+
+    // penalties: base motion + angular speed (inertia)
+    a->fitness -= dt * 0.05f * (fabsf(a->pivot_v) / ga->max_base_speed);
+    a->fitness -= dt * 0.08f * fabsf(a->omega);
+    if (a->fitness < 0.f)
+        a->fitness = 0.f;
 
     if (write_fitness)
         g->fitness = a->fitness;
@@ -373,7 +382,7 @@ void ga_init(GAContext* ga, int population_size)
     ga->population_size = population_size;
     ga->generation      = 0;
     ga->eval_time       = 0.f;
-    ga->eval_duration   = 12.0f;
+    ga->eval_duration   = 15.0f;
     ga->running         = 0;
     ga->stage           = GA_STAGE_EVAL;
     ga->best_index      = 0;
