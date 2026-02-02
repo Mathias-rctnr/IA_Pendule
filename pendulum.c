@@ -78,15 +78,15 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
         p->pivot.y + p->length * cosf(p->theta)};
 
     // Shapes
-    p->base_rect = createRoundedRect((sfVector2f){1000.f, 10.f}, 5.f, 10);
+    p->base_rect = createRoundedRect((sfVector2f){900.f, 12.f}, 6.f, 12);
     if (!p->base_rect)
         return false;
-    sfConvexShape_setFillColor(p->base_rect, make_color(0xA6, 0xA9, 0xAA, 0xCC));
+    sfConvexShape_setFillColor(p->base_rect, make_color(0x1B, 0x1F, 0x24, 0xFF));
     sfConvexShape_setOutlineThickness(p->base_rect, 1.f);
-    sfConvexShape_setOutlineColor(p->base_rect, make_color(0xFF, 0xFF, 0xFF, 0xFF));
+    sfConvexShape_setOutlineColor(p->base_rect, make_color(0x2D, 0x33, 0x3B, 0xFF));
     sfConvexShape_setPosition(p->base_rect,
-                              (sfVector2f){(window_size.x - 1000.f) / 2.f,
-                                           (window_size.y - 10.f) / 2.f});
+                              (sfVector2f){(window_size.x - 900.f) / 2.f,
+                                           (window_size.y - 12.f) / 2.f});
 
     p->rod = sfRectangleShape_create();
     p->pivot_shape = sfCircleShape_create();
@@ -97,37 +97,37 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
         return false;
 
     // Rod
-    sfRectangleShape_setSize(p->rod, (sfVector2f){p->length, 3.f});
-    sfRectangleShape_setOrigin(p->rod, (sfVector2f){0.f, 1.5f});
-    sfRectangleShape_setFillColor(p->rod, make_color(0xFE, 0xFA, 0x8E, 0xFF));
+    sfRectangleShape_setSize(p->rod, (sfVector2f){p->length, 4.f});
+    sfRectangleShape_setOrigin(p->rod, (sfVector2f){0.f, 2.f});
+    sfRectangleShape_setFillColor(p->rod, make_color(0xC9, 0xD1, 0xD9, 0xFF));
     sfRectangleShape_setPosition(p->rod, p->pivot);
 
     // Pivot circle
-    const float pivot_r = 20.f;
+    const float pivot_r = 18.f;
     sfCircleShape_setRadius(p->pivot_shape, pivot_r);
     sfCircleShape_setOrigin(p->pivot_shape, (sfVector2f){pivot_r, pivot_r});
     sfCircleShape_setFillColor(p->pivot_shape, make_color(0xF4, 0xEE, 0x2A, 0xFF));
-    sfCircleShape_setOutlineThickness(p->pivot_shape, 1.f);
-    sfCircleShape_setOutlineColor(p->pivot_shape, make_color(0xFE, 0xFA, 0x8E, 0xFF));
+    sfCircleShape_setOutlineThickness(p->pivot_shape, 2.f);
+    sfCircleShape_setOutlineColor(p->pivot_shape, make_color(0xC9, 0xB9, 0x1A, 0xFF));
     sfCircleShape_setPosition(p->pivot_shape, p->pivot);
 
     // Bob circle
-    const float bob_r = 15.f;
+    const float bob_r = 16.f;
     sfCircleShape_setRadius(p->bob_shape, bob_r);
     sfCircleShape_setOrigin(p->bob_shape, (sfVector2f){bob_r, bob_r});
     sfCircleShape_setFillColor(p->bob_shape, make_color(0xF4, 0xEE, 0x2A, 0xFF));
-    sfCircleShape_setOutlineThickness(p->bob_shape, 1.f);
-    sfCircleShape_setOutlineColor(p->bob_shape, make_color(0xFE, 0xFA, 0x8E, 0xFF));
+    sfCircleShape_setOutlineThickness(p->bob_shape, 2.f);
+    sfCircleShape_setOutlineColor(p->bob_shape, make_color(0xC9, 0xB9, 0x1A, 0xFF));
     sfCircleShape_setPosition(p->bob_shape, p->bob_pos);
 
     // Slider visuals
     sfRectangleShape_setSize(p->slider_track, (sfVector2f){p->track_width, p->track_height});
     sfRectangleShape_setPosition(p->slider_track, (sfVector2f){p->track_left, p->track_y});
-    sfRectangleShape_setFillColor(p->slider_track, make_color(0x55, 0x55, 0x55, 0xFF));
+    sfRectangleShape_setFillColor(p->slider_track, make_color(0x2A, 0x2F, 0x36, 0xFF));
 
     sfCircleShape_setRadius(p->slider_thumb, p->thumb_radius);
     sfCircleShape_setOrigin(p->slider_thumb, (sfVector2f){p->thumb_radius, p->thumb_radius});
-    sfCircleShape_setFillColor(p->slider_thumb, make_color(0xDD, 0xDD, 0xDD, 0xFF));
+    sfCircleShape_setFillColor(p->slider_thumb, make_color(0xC9, 0xD1, 0xD9, 0xFF));
     sfCircleShape_setPosition(
         p->slider_thumb,
         (sfVector2f){p->track_left + p->slider_value * p->track_width,
@@ -260,8 +260,8 @@ void pendulum_update(Pendulum* p, float dt)
     const sfVector2f d = {p->bob_pos.x - p->pivot.x, p->bob_pos.y - p->pivot.y};
     const float len = hypotf(d.x, d.y);
     const float angleDeg = atan2f(d.y, d.x) * 180.f / (float)M_PI;
-    sfRectangleShape_setSize(p->rod, (sfVector2f){len, 3.f});
-    sfRectangleShape_setOrigin(p->rod, (sfVector2f){0.f, 1.5f});
+    sfRectangleShape_setSize(p->rod, (sfVector2f){len, 4.f});
+    sfRectangleShape_setOrigin(p->rod, (sfVector2f){0.f, 2.f});
     sfRectangleShape_setPosition(p->rod, p->pivot);
     sfRectangleShape_setRotation(p->rod, angleDeg);
 

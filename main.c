@@ -31,7 +31,7 @@ static void draw_network(sfRenderWindow* window, const GAContext* ga, sfVector2u
     sfRectangleShape* bg = sfRectangleShape_create();
     sfRectangleShape_setSize(bg, (sfVector2f){panel_w, panel_h});
     sfRectangleShape_setPosition(bg, (sfVector2f){panel_x, panel_y});
-    sfRectangleShape_setFillColor(bg, (sfColor){0x00, 0x00, 0x00, 0x55});
+    sfRectangleShape_setFillColor(bg, (sfColor){0x12, 0x15, 0x1A, 0xDD});
     sfRenderWindow_drawRectangleShape(window, bg, NULL);
     sfRectangleShape_destroy(bg);
 
@@ -129,7 +129,7 @@ int main(void)
     }
 
     GAContext ga;
-    ga_init(&ga, 150);
+    ga_init(&ga, 1000);
     ga_set_env(&ga,
                pendulum.track_left,
                pendulum.track_width,
@@ -161,25 +161,27 @@ int main(void)
         sfRenderWindow_destroy(window);
         return EXIT_FAILURE;
     }
-    sfText_setCharacterSize(info_text, 16);
-    sfText_setFillColor(info_text, sfWhite);
-    sfText_setPosition(info_text, (sfVector2f){20.f, 70.f});
+    sfText_setCharacterSize(info_text, 15);
+    sfText_setFillColor(info_text, (sfColor){0xC9, 0xD1, 0xD9, 0xFF});
+    sfText_setPosition(info_text, (sfVector2f){24.f, 76.f});
 
-    sfText_setCharacterSize(button_text, 16);
-    sfText_setFillColor(button_text, sfWhite);
+    sfText_setCharacterSize(button_text, 15);
+    sfText_setFillColor(button_text, (sfColor){0xF4, 0xEE, 0x2A, 0xFF});
     sfText_setCharacterSize(grad_text, 12);
     sfText_setFillColor(grad_text, (sfColor){0xF4, 0xEE, 0x2A, 0xFF});
-    sfRectangleShape_setSize(button, (sfVector2f){140.f, 36.f});
-    sfRectangleShape_setPosition(button, (sfVector2f){20.f, 20.f});
-    sfRectangleShape_setFillColor(button, (sfColor){0x2A, 0x2A, 0x2A, 0xFF});
+    sfRectangleShape_setSize(button, (sfVector2f){148.f, 36.f});
+    sfRectangleShape_setPosition(button, (sfVector2f){24.f, 24.f});
+    sfRectangleShape_setFillColor(button, (sfColor){0x1B, 0x1F, 0x24, 0xFF});
+    sfRectangleShape_setOutlineThickness(button, 1.f);
+    sfRectangleShape_setOutlineColor(button, (sfColor){0x2D, 0x33, 0x3B, 0xFF});
 
-    sfRectangleShape_setSize(agent_rod, (sfVector2f){100.f, 2.f});
-    sfRectangleShape_setOrigin(agent_rod, (sfVector2f){0.f, 1.f});
-    sfCircleShape_setRadius(agent_bob, 8.f);
-    sfCircleShape_setOrigin(agent_bob, (sfVector2f){8.f, 8.f});
+    sfRectangleShape_setSize(agent_rod, (sfVector2f){100.f, 3.f});
+    sfRectangleShape_setOrigin(agent_rod, (sfVector2f){0.f, 1.5f});
+    sfCircleShape_setRadius(agent_bob, 10.f);
+    sfCircleShape_setOrigin(agent_bob, (sfVector2f){10.f, 10.f});
 
     sfRectangleShape_setSize(threshold_line, (sfVector2f){(float)mode.size.x, 2.f});
-    sfRectangleShape_setFillColor(threshold_line, (sfColor){0xFF, 0x66, 0x66, 0x80});
+    sfRectangleShape_setFillColor(threshold_line, (sfColor){0xFF, 0x9A, 0x76, 0x70});
     float threshold_y = pendulum.pivot.y + pendulum.length * ga.upright_threshold;
     sfRectangleShape_setPosition(threshold_line, (sfVector2f){0.f, threshold_y});
 
@@ -196,20 +198,20 @@ int main(void)
         float x = grad_left + t * grad_span;
         bool major = (v % 10) == 0;
         float h = major ? 10.f : 5.f;
-        sfColor col = major ? (sfColor){0xF4, 0xEE, 0x2A, 0xFF} : (sfColor){0xCC, 0xCC, 0xCC, 0xFF};
+        sfColor col = major ? (sfColor){0xF4, 0xEE, 0x2A, 0xFF} : (sfColor){0x63, 0x6A, 0x73, 0xFF};
         sfVertex v0 = { .position = {x, grad_y}, .color = col };
         sfVertex v1 = { .position = {x, grad_y + h}, .color = col };
         sfVertexArray_append(grad_ticks, v0);
         sfVertexArray_append(grad_ticks, v1);
     }
 
-    const float chart_x = 200.f;
+    const float chart_x = (float)mode.size.x - 260.f - 20.f - 220.f - 16.f;
     const float chart_y = 20.f;
     const float chart_w = 220.f;
     const float chart_h = 90.f;
     sfRectangleShape_setSize(chart_bg, (sfVector2f){chart_w, chart_h});
     sfRectangleShape_setPosition(chart_bg, (sfVector2f){chart_x, chart_y});
-    sfRectangleShape_setFillColor(chart_bg, (sfColor){0x00, 0x00, 0x00, 0x40});
+    sfRectangleShape_setFillColor(chart_bg, (sfColor){0x12, 0x15, 0x1A, 0xB0});
     sfVertexArray_setPrimitiveType(chart_line, sfLineStrip);
 
     sfClock* clock = sfClock_create();
@@ -220,7 +222,7 @@ int main(void)
         return EXIT_FAILURE;
     }
 
-    const sfColor bg = {0x3e, 0x3e, 0x3e, 0xFF}; // background color
+    const sfColor bg = {0x10, 0x12, 0x15, 0xFF}; // background color
 
     sfEvent event;
     bool running = true;
@@ -382,7 +384,7 @@ int main(void)
                 float t = (float)i / (float)(history_count - 1);
                 float x = chart_x + t * chart_w;
                 float y = chart_y + chart_h - (history[i] - minv) / (maxv - minv) * chart_h;
-                sfVertex v = { .position = {x, y}, .color = (sfColor){0x6A, 0xE3, 0x74, 0xFF} };
+            sfVertex v = { .position = {x, y}, .color = (sfColor){0xF4, 0xEE, 0x2A, 0xFF} };
                 sfVertexArray_append(chart_line, v);
             }
             sfRenderWindow_drawRectangleShape(window, chart_bg, NULL);
@@ -391,7 +393,7 @@ int main(void)
         // UI
         sfText_setString(button_text, ga.running ? "Stop GA" : "Start GA");
         sfVector2f bp = sfRectangleShape_getPosition(button);
-        sfText_setPosition(button_text, (sfVector2f){bp.x + 16.f, bp.y + 8.f});
+        sfText_setPosition(button_text, (sfVector2f){bp.x + 18.f, bp.y + 8.f});
         char info[256];
         char time_left[32];
         if (!fast_mode)
