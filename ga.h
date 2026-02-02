@@ -55,6 +55,12 @@ typedef struct
     float   max_base_speed;
     float   upright_threshold;
 
+    Genome  champion;
+    int     has_champion;
+    float   champion_fitness;
+    GAAgent display_agent;
+    int     display_active;
+
     Genome* population;
     GAAgent* agents;
 } GAContext;
@@ -74,5 +80,9 @@ void  ga_set_env(GAContext* ga,
                  float upright_threshold);
 void  ga_start(GAContext* ga);
 void  ga_update(GAContext* ga, float dt);
+void  ga_run_generation(GAContext* ga, float dt);
+void  ga_display_step(GAContext* ga, float dt);
+void  ga_reset_agents(GAContext* ga);
+const GAAgent* ga_get_display_agent(const GAContext* ga);
 const GAAgent* ga_get_agents(const GAContext* ga, int* count, int* best_index);
 void  ga_free(GAContext* ga);

@@ -24,7 +24,7 @@ int main(void)
     }
 
     GAContext ga;
-    ga_init(&ga, 30);
+    ga_init(&ga, 60);
     ga_set_env(&ga,
                pendulum.track_left,
                pendulum.track_width,
@@ -100,8 +100,8 @@ int main(void)
     int history_cap = 0;
     int last_gen = -1;
     bool fast_mode = false;
-    float sim_speed = 1.f;
     const float fixed_step = 1.f / 120.f;
+    float display_accum = 0.f;
     while (running && sfRenderWindow_isOpen(window))
     {
         while (sfRenderWindow_pollEvent(window, &event))
@@ -111,7 +111,9 @@ int main(void)
             if (event.type == sfEvtKeyPressed && event.key.code == sfKeyF)
             {
                 fast_mode = !fast_mode;
-                sim_speed = fast_mode ? ga.eval_duration : 1.f; // ~1s per generation
+                if (ga.running && !fast_mode)
+                    ga_reset_agents(&ga);
+                display_accum = 0.f;
             }
             if (event.type == sfEvtMouseButtonPressed && event.mouseButton.button == sfMouseLeft)
             {
@@ -127,6 +129,7 @@ int main(void)
                         pendulum_reset(&pendulum);
                         history_count = 0;
                         last_gen = ga.generation;
+                        display_accum = 0.f;
                     }
                     else
                     {
@@ -144,12 +147,16 @@ int main(void)
         float dt = sfTime_asSeconds(sfClock_restart(clock));
         if (ga.running)
         {
-            float sim_time = dt * sim_speed;
-            while (sim_time > 0.f)
+            if (fast_mode)
+                ga_run_generation(&ga, fixed_step);
+            else
             {
-                float step = sim_time > fixed_step ? fixed_step : sim_time;
-                ga_update(&ga, step);
-                sim_time -= step;
+                display_accum += dt;
+                while (display_accum >= fixed_step)
+                {
+                    ga_display_step(&ga, fixed_step);
+                    display_accum -= fixed_step;
+                }
             }
             if (ga.generation != last_gen)
             {
@@ -185,13 +192,10 @@ int main(void)
             sfRenderWindow_drawRectangleShape(window, pendulum.slider_track, NULL);
             sfRenderWindow_drawRectangleShape(window, threshold_line, NULL);
 
-            int count = 0, best = 0;
-            const GAAgent* agents = ga_get_agents(&ga, &count, &best);
-            for (int i = 0; i < count; ++i)
+            const GAAgent* a = ga_get_display_agent(&ga);
+            if (a)
             {
-                const GAAgent* a = &agents[i];
-                sfColor col = (i == best) ? (sfColor){0xF4, 0xEE, 0x2A, 0xFF}
-                                          : (sfColor){0xF4, 0xEE, 0x2A, 0x40};
+                sfColor col = (sfColor){0xF4, 0xEE, 0x2A, 0xFF};
                 sfRectangleShape_setFillColor(agent_rod, col);
                 sfCircleShape_setFillColor(agent_bob, col);
 
@@ -208,7 +212,7 @@ int main(void)
                 sfRenderWindow_drawCircleShape(window, agent_bob, NULL);
             }
         }
-        else
+        else if (!ga.running)
         {
             pendulum_draw(&pendulum, window);
         }
@@ -241,20 +245,46 @@ int main(void)
         sfVector2f bp = sfRectangleShape_getPosition(button);
         sfText_setPosition(button_text, (sfVector2f){bp.x + 16.f, bp.y + 8.f});
         char info[256];
+        char time_left[32];
+        if (!fast_mode)
+            snprintf(time_left, sizeof(time_left), "%.1fs", ga.eval_duration - ga.eval_time);
+        else
+            snprintf(time_left, sizeof(time_left), "--");
         const char* stage =
             (ga.stage == GA_STAGE_EVAL) ? "EVAL" : (ga.stage == GA_STAGE_SELECT) ? "SELECT" : "MUTATE";
-        float remaining = (ga.stage == GA_STAGE_EVAL) ? (ga.eval_duration - ga.eval_time) : 0.f;
-        snprintf(info, sizeof(info),
-                 "GA: %s  Speed x%.1f  %s\nGen: %d  Pop: %d\nBest fitness: %.2f\nGen best: %.2f\nThr: %.2f\nTime left: %.1fs",
-                 ga.running ? "ON" : "OFF",
-                 sim_speed,
-                 stage,
-                 ga.generation,
-                 ga.population_size,
-                 ga.best_fitness,
-                 ga.gen_best_fitness,
-                 ga.upright_threshold,
-                 remaining);
+        const GAAgent* display_agent = ga_get_display_agent(&ga);
+        float champ = ga.has_champion ? ga.champion_fitness : ga.best_fitness;
+        float display_score = (display_agent ? display_agent->fitness : 0.f);
+        char display_buf[32];
+        snprintf(display_buf, sizeof(display_buf), "%.2f", display_score);
+        if (fast_mode)
+        {
+            snprintf(info, sizeof(info),
+                     "GA: %s  Mode: %s  %s\nGen: %d  Pop: %d\nBest ever: %.2f\nGen best: %.2f\nThr: %.2f\nTime left: %s",
+                     ga.running ? "ON" : "OFF",
+                     "FAST",
+                     stage,
+                     ga.generation,
+                     ga.population_size,
+                     champ,
+                     ga.gen_best_fitness,
+                     ga.upright_threshold,
+                     time_left);
+        }
+        else
+        {
+            snprintf(info, sizeof(info),
+                     "GA: %s  Mode: %s  %s\nGen: %d  Pop: %d\nDisplay score: %s\nBest ever: %.2f\nThr: %.2f\nTime left: %s",
+                     ga.running ? "ON" : "OFF",
+                     "DISPLAY",
+                     stage,
+                     ga.generation,
+                     ga.population_size,
+                     display_buf,
+                     champ,
+                     ga.upright_threshold,
+                     time_left);
+        }
         sfText_setString(info_text, info);
         sfRenderWindow_drawRectangleShape(window, button, NULL);
         sfRenderWindow_drawText(window, button_text, NULL);
