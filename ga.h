@@ -12,6 +12,7 @@ typedef struct
     float w_in[GA_MAX_HIDDEN][GA_INPUTS];
     float b_h[GA_MAX_HIDDEN];
     float w_out[GA_MAX_HIDDEN];
+    float w_direct[GA_INPUTS];
     float b_out;
     float fitness;
 } Genome;
@@ -54,6 +55,7 @@ typedef struct
     float   max_speed_factor;
     float   max_base_speed;
     float   upright_threshold;
+    int     allow_remove_nodes;
 
     Genome  champion;
     int     has_champion;

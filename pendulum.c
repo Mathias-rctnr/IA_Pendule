@@ -55,12 +55,15 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
     p->max_base_speed   = 600.f;  // px/s cap for GA control
     p->first_frame      = true;
 
-    // Slider setup
-    p->track_width  = 800.f;
+    const float base_w = 900.f;
+    const float base_h = 12.f;
+
+    // Slider setup (match base width)
+    p->track_width  = base_w;
     p->track_height = 8.f;
     p->thumb_radius = 12.f;
     p->track_y      = window_size.y - 80.f;
-    p->track_left   = (window_size.x - p->track_width) / 2.f;
+    p->track_left   = (window_size.x - base_w) / 2.f;
     p->slider_value = 0.5f;
     p->slider_drag  = false;
     p->bob_drag     = false;
@@ -78,15 +81,15 @@ bool pendulum_init(Pendulum* p, sfVector2u window_size)
         p->pivot.y + p->length * cosf(p->theta)};
 
     // Shapes
-    p->base_rect = createRoundedRect((sfVector2f){900.f, 12.f}, 6.f, 12);
+    p->base_rect = createRoundedRect((sfVector2f){base_w, base_h}, 6.f, 12);
     if (!p->base_rect)
         return false;
     sfConvexShape_setFillColor(p->base_rect, make_color(0x1B, 0x1F, 0x24, 0xFF));
     sfConvexShape_setOutlineThickness(p->base_rect, 1.f);
     sfConvexShape_setOutlineColor(p->base_rect, make_color(0x2D, 0x33, 0x3B, 0xFF));
     sfConvexShape_setPosition(p->base_rect,
-                              (sfVector2f){(window_size.x - 900.f) / 2.f,
-                                           (window_size.y - 12.f) / 2.f});
+                              (sfVector2f){(window_size.x - base_w) / 2.f,
+                                           (window_size.y - base_h) / 2.f});
 
     p->rod = sfRectangleShape_create();
     p->pivot_shape = sfCircleShape_create();

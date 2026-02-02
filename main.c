@@ -77,6 +77,21 @@ static void draw_network(sfRenderWindow* window, const GAContext* ga, sfVector2u
         }
     }
 
+    // links: input -> output (direct)
+    for (int i = 0; i < in_count; ++i)
+    {
+        float w = g->w_direct[i];
+        float a = clampf(fabsf(w), 0.f, 1.f);
+        uint8_t alpha = (uint8_t)(30 + 120 * a);
+        sfColor col = (w >= 0.f) ? (sfColor){0x8F, 0xD7, 0xFF, alpha}
+                                 : (sfColor){0xFF, 0xB1, 0x8A, alpha};
+        sfVertex line[2] = {
+            { .position = in_pos[i], .color = col },
+            { .position = out_pos, .color = col }
+        };
+        sfRenderWindow_drawPrimitives(window, line, 2, sfLines, NULL);
+    }
+
     // links: hidden -> output
     for (int h = 0; h < hid_count; ++h)
     {
@@ -214,6 +229,7 @@ int main(void)
     sfRectangleShape_setFillColor(chart_bg, (sfColor){0x12, 0x15, 0x1A, 0xB0});
     sfVertexArray_setPrimitiveType(chart_line, sfLineStrip);
 
+
     sfClock* clock = sfClock_create();
     if (!clock)
     {
@@ -315,6 +331,7 @@ int main(void)
             pendulum_update(&pendulum, dt);
         }
 
+
         sfRenderWindow_clear(window, bg);
         if (ga.running && !fast_mode)
         {
@@ -390,6 +407,7 @@ int main(void)
             sfRenderWindow_drawRectangleShape(window, chart_bg, NULL);
             sfRenderWindow_drawVertexArray(window, chart_line, NULL);
         }
+
         // UI
         sfText_setString(button_text, ga.running ? "Stop GA" : "Start GA");
         sfVector2f bp = sfRectangleShape_getPosition(button);

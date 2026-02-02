@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <pthread.h>
+#include <stdio.h>
 
 #define GA_THREAD_COUNT 14
 
@@ -12,6 +13,7 @@ typedef enum
     MUTATE_NONE = 0,
     MUTATE_NEW_CONN,
     MUTATE_NEW_NODE,
+    MUTATE_REMOVE_NODE,
     MUTATE_WEIGHTS
 } MutationKind;
 
@@ -22,7 +24,7 @@ static float frand(float a, float b)
 
 static void init_genome(Genome* g)
 {
-    g->hidden = 2 + rand() % (GA_MAX_HIDDEN - 1);
+    g->hidden = 1 + (rand() % GA_MAX_HIDDEN);
     for (int i = 0; i < GA_MAX_HIDDEN; ++i)
     {
         g->b_h[i] = frand(-0.5f, 0.5f);
@@ -30,6 +32,8 @@ static void init_genome(Genome* g)
         for (int j = 0; j < GA_INPUTS; ++j)
             g->w_in[i][j] = frand(-1.f, 1.f);
     }
+    for (int j = 0; j < GA_INPUTS; ++j)
+        g->w_direct[j] = frand(-1.f, 1.f);
     g->b_out = frand(-0.5f, 0.5f);
     g->fitness = 0.f;
 }
@@ -45,6 +49,8 @@ static float eval_network(const Genome* g, const float in[GA_INPUTS])
         h[i] = tanhf(sum);
     }
     float out = g->b_out;
+    for (int j = 0; j < GA_INPUTS; ++j)
+        out += g->w_direct[j] * in[j];
     for (int i = 0; i < g->hidden; ++i)
         out += g->w_out[i] * h[i];
     return tanhf(out);
@@ -249,15 +255,17 @@ static int cmp_fitness_desc(const void* a, const void* b)
     return (ga->fitness < gb->fitness) - (ga->fitness > gb->fitness);
 }
 
-static MutationKind pick_mutation_kind(void)
+static MutationKind pick_mutation_kind(const GAContext* ga)
 {
     float r = frand(0.f, 1.f);
     if (r < 0.10f)
         return MUTATE_NONE;
     if (r < 0.25f)
         return MUTATE_NEW_CONN;
-    if (r < 0.35f)
+    if (r < 0.50f)
         return MUTATE_NEW_NODE;
+    if (ga && ga->allow_remove_nodes && r < 0.55f)
+        return MUTATE_REMOVE_NODE;
     return MUTATE_WEIGHTS;
 }
 
@@ -275,6 +283,11 @@ static void mutate_weights(Genome* g, float sigma, float prob)
                 g->w_in[i][j] += frand(-sigma, sigma);
         }
     }
+    for (int j = 0; j < GA_INPUTS; ++j)
+    {
+        if (frand(0.f, 1.f) < prob)
+            g->w_direct[j] += frand(-sigma, sigma);
+    }
     if (frand(0.f, 1.f) < prob)
         g->b_out += frand(-sigma, sigma);
 }
@@ -289,11 +302,18 @@ static void mutate_genome(Genome* g, MutationKind kind, float sigma, float prob)
             break;
         case MUTATE_NEW_CONN:
         {
-            int i = rand() % g->hidden;
-            if (rand() % 2)
-                g->w_out[i] = frand(-1.f, 1.f);
+            if (g->hidden > 0)
+            {
+                int i = rand() % g->hidden;
+                if (rand() % 2)
+                    g->w_out[i] = frand(-1.f, 1.f);
+                else
+                    g->w_in[i][rand() % GA_INPUTS] = frand(-1.f, 1.f);
+            }
             else
-                g->w_in[i][rand() % GA_INPUTS] = frand(-1.f, 1.f);
+            {
+                g->w_direct[rand() % GA_INPUTS] = frand(-1.f, 1.f);
+            }
             break;
         }
         case MUTATE_NEW_NODE:
@@ -311,6 +331,14 @@ static void mutate_genome(Genome* g, MutationKind kind, float sigma, float prob)
             {
                 mutate_weights(g, sigma, prob);
             }
+            break;
+        }
+        case MUTATE_REMOVE_NODE:
+        {
+            if (g->hidden > 1)
+                g->hidden--;
+            else
+                mutate_weights(g, sigma, prob);
             break;
         }
         case MUTATE_WEIGHTS:
@@ -331,6 +359,8 @@ static Genome crossover(const Genome* a, const Genome* b)
         for (int j = 0; j < GA_INPUTS; ++j)
             c.w_in[i][j] = (rand() % 2) ? a->w_in[i][j] : b->w_in[i][j];
     }
+    for (int j = 0; j < GA_INPUTS; ++j)
+        c.w_direct[j] = (rand() % 2) ? a->w_direct[j] : b->w_direct[j];
     c.b_out = (rand() % 2) ? a->b_out : b->b_out;
     c.fitness = 0.f;
     return c;
@@ -356,14 +386,50 @@ static void ga_do_mutate(GAContext* ga)
     int elite = (int)(ga->population_size * 0.3f);
     if (elite < 1)
         elite = 1;
+    int count_none = 0;
+    int count_new_conn = 0;
+    int count_new_node = 0;
+    int count_remove_node = 0;
+    int count_weights = 0;
+    int count_weights_extra = 0;
+    int count_new_conn_extra = 0;
     for (int i = elite; i < ga->population_size; ++i)
     {
         int p1 = rand() % elite;
         int p2 = rand() % elite;
         Genome child = crossover(&ga->population[p1], &ga->population[p2]);
         ga->population[i] = child;
-        MutationKind kind = pick_mutation_kind();
+        MutationKind kind = pick_mutation_kind(ga);
         mutate_genome(&ga->population[i], kind, 0.25f, 0.15f);
+        switch (kind)
+        {
+            case MUTATE_NONE:
+                count_none++;
+                break;
+            case MUTATE_NEW_CONN:
+                count_new_conn++;
+                break;
+            case MUTATE_NEW_NODE:
+                count_new_node++;
+                break;
+            case MUTATE_REMOVE_NODE:
+                count_remove_node++;
+                break;
+            case MUTATE_WEIGHTS:
+            default:
+                count_weights++;
+                break;
+        }
+        if (frand(0.f, 1.f) < 0.30f)
+        {
+            mutate_genome(&ga->population[i], MUTATE_WEIGHTS, 0.15f, 0.25f);
+            count_weights_extra++;
+        }
+        if (frand(0.f, 1.f) < 0.10f)
+        {
+            mutate_genome(&ga->population[i], MUTATE_NEW_CONN, 0.0f, 0.0f);
+            count_new_conn_extra++;
+        }
     }
 
     // weaker agents get extra (light) mutation
@@ -401,6 +467,7 @@ void ga_init(GAContext* ga, int population_size)
     ga->display_active  = 0;
     ga->max_base_speed  = 600.f;
     ga->upright_threshold = -0.7f;
+    ga->allow_remove_nodes = 0;
     ga->population      = calloc((size_t)ga->population_size, sizeof(Genome));
     ga->agents          = calloc((size_t)ga->population_size, sizeof(GAAgent));
     for (int i = 0; i < ga->population_size; ++i)
